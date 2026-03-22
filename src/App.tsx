@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createDefaultMatrix } from "../shared/generators";
+import { createDefaultMatrix, generateCommitPlan } from "../shared/generators";
 import type {
   ArtPattern,
   ExecutePlanRequest,
@@ -171,6 +171,25 @@ export default function App() {
 
     return rows;
   }, [preview]);
+
+  const sourcePlan = useMemo(() => {
+    try {
+      return generateCommitPlan(request);
+    } catch {
+      return null;
+    }
+  }, [request]);
+
+  const sourceGrid = useMemo(() => {
+    if (!sourcePlan) return [] as number[][];
+    const rows = Array.from({ length: 7 }, () => Array.from({ length: sourcePlan.stats.weeks }, () => 0));
+
+    for (const day of sourcePlan.days) {
+      rows[day.dayOfWeek][day.weekIndex] = day.commits;
+    }
+
+    return rows;
+  }, [sourcePlan]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f7f4ed_0%,#f3efe6_40%,#ece7dd_100%)] text-[#1f2721]">
@@ -350,8 +369,9 @@ export default function App() {
           </section>
 
           <section className="space-y-6">
-            {(mode === "matrix" || mode === "art") && (
-              <div className="rounded-[28px] border border-white/70 bg-white/75 p-5 shadow-[0_24px_60px_rgba(44,52,37,0.07)] backdrop-blur sm:p-6">
+            <div className="rounded-[28px] border border-white/70 bg-white/75 p-5 shadow-[0_24px_60px_rgba(44,52,37,0.07)] backdrop-blur sm:p-6">
+              {mode === "matrix" ? (
+                <>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#71806d]">Editor</p>
@@ -493,8 +513,97 @@ export default function App() {
                     </div>
                   </aside>
                 </div>
-              </div>
-            )}
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#71806d]">Source Graph</p>
+                      <h2 className="mt-2 font-['Manrope',sans-serif] text-2xl font-semibold tracking-[-0.03em] text-[#1f2721]">
+                        Generated pattern
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-[#566354]">
+                        {mode === "art"
+                          ? "This mode renders a centered preset pattern from the selected template."
+                          : "This mode builds the contribution shape algorithmically from the current settings and seed."}
+                      </p>
+                    </div>
+
+                    <div className="rounded-full border border-[#d9d3c7] bg-[#f8f4eb] px-4 py-2 text-sm font-semibold text-[#566354]">
+                      Read-only view
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
+                    <div className="rounded-[24px] border border-[#dcd7ca] bg-[linear-gradient(180deg,#faf7f1,#f3eee5)] p-4">
+                      <div className="mb-4 flex flex-wrap items-center gap-2">
+                        {mode !== "art" && (
+                          <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#4e5c4c]">
+                            Seed: {seed || "auto"}
+                          </div>
+                        )}
+                        <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#4e5c4c]">
+                          Cap: {maxCommitsPerDay}/day
+                        </div>
+                        {mode === "art" && (
+                          <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold capitalize text-[#4e5c4c]">
+                            Pattern: {artPattern}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-[20px] border border-[#d5d0c4] bg-[#f7f4ec] p-3 sm:p-4">
+                        <div className="grid grid-rows-7 gap-0.5 sm:gap-1.5">
+                          {sourceGrid.map((row, rowIndex) => (
+                            <div
+                              key={rowIndex}
+                              className="grid grid-cols-[28px_repeat(var(--weeks),minmax(0,1fr))] items-center gap-0.5 sm:grid-cols-[40px_repeat(var(--weeks),minmax(0,1fr))] sm:gap-1.5"
+                              style={{ ["--weeks" as string]: sourcePlan?.stats.weeks ?? 53 }}
+                            >
+                              <span className="text-[9px] font-medium uppercase tracking-[0.08em] text-[#677364] sm:text-[11px] sm:tracking-[0.12em]">
+                                {WEEK_DAYS[rowIndex]}
+                              </span>
+                              {row.map((commits, colIndex) => {
+                                const level =
+                                  commits === 0 ? 0 : Math.min(4, Math.ceil((commits / Math.max(maxCommitsPerDay, 1)) * 4));
+
+                                return (
+                                  <div
+                                    key={`${rowIndex}-${colIndex}`}
+                                    className={`aspect-square w-full rounded-[3px] border sm:rounded-[5px] ${getLevelStyle(level)}`}
+                                    title={`${commits} commits`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <aside className="rounded-[24px] border border-[#dcd7ca] bg-[#f8f5ee] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#71806d]">Mode notes</div>
+                      <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm leading-6 text-[#465343]">
+                        {MODE_DESCRIPTIONS[mode]}
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        {LEVEL_STYLES.map((style, level) => (
+                          <div key={level} className="flex items-center justify-between rounded-2xl bg-white/80 px-3 py-2">
+                            <div className="flex items-center gap-3">
+                              <span className={`h-4 w-4 rounded-full border ${style}`} />
+                              <span className="text-sm font-medium text-[#465343]">Level {level}</span>
+                            </div>
+                            <span className="text-xs uppercase tracking-[0.18em] text-[#80907c]">
+                              {level === 0 ? "Empty" : level < 3 ? "Light" : "Dense"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </aside>
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="rounded-[28px] border border-white/70 bg-white/75 p-5 shadow-[0_24px_60px_rgba(44,52,37,0.07)] backdrop-blur sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
