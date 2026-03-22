@@ -1,6 +1,6 @@
 # ArtTribute
 
-![Preview](./preview.jpg)
+![Preview](./preview.png)
 
 ArtTribute is a local creative utility for drawing and generating Git-style activity patterns.
 It combines matrix painting and procedural generation (Perlin, Uniform, Gaussian, Worker 5/2, and Art presets) to create commit schedules for study and visualization.

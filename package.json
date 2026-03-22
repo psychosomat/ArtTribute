@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:server": "bun --watch server/index.ts",
     "build": "tsc --noEmit && vite build",
+    "lint": "tsc --noEmit",
     "check": "tsc --noEmit",
     "preview": "vite preview"
   },
